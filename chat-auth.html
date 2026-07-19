@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Пёрышко — чат</title>
+<style>
+  :root {
+    --bg: #12151a;
+    --panel: #1b2028;
+    --accent: #ff8a3d;
+    --accent-soft: #3a2a1f;
+    --text: #eceef1;
+    --text-dim: #8b93a1;
+    --bubble-me: #ff8a3d;
+    --bubble-them: #262c36;
+    --radius: 20px;
+    --danger: #ff6b6b;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    overscroll-behavior: none;
+  }
+  #app-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--bg);
+  }
+
+  /* --- Auth screen --- */
+  #auth-screen {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; padding: 24px;
+    height: 100%;
+  }
+  #auth-screen h1 { font-size: 22px; margin: 0 0 2px; }
+  #auth-screen p.sub { color: var(--text-dim); font-size: 14px; text-align: center; margin: 0 0 10px; max-width: 300px; }
+  .auth-field {
+    width: 100%; max-width: 300px;
+    padding: 13px 16px; border-radius: 14px; border: none;
+    background: #262c36; color: var(--text); font-size: 16px;
+    font-family: inherit;
+  }
+  .auth-btn {
+    width: 100%; max-width: 300px;
+    padding: 13px; border-radius: 14px; border: none;
+    background: var(--accent); color: #1a1200;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+  }
+  .auth-btn:disabled { opacity: 0.4; }
+  .auth-btn.secondary {
+    background: transparent; color: var(--accent); font-weight: 600;
+    padding: 6px;
+  }
+  #auth-error {
+    color: var(--danger); font-size: 13px; text-align: center;
+    max-width: 300px; min-height: 16px;
+  }
+  #auth-loading { color: var(--text-dim); font-size: 13px; }
+
+  /* --- Header --- */
+  header {
+    padding: calc(env(safe-area-inset-top) + 14px) 18px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #23282f;
+    flex-shrink: 0;
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: linear-gradient(135deg, #ff8a3d, #ff5f5f);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 600; font-size: 15px; color: #12151a;
+    flex-shrink: 0;
+  }
+  .header-info { flex: 1; min-width: 0; }
+  .header-info .name { font-size: 16px; font-weight: 600; }
+  .header-info .status { font-size: 12.5px; color: var(--text-dim); }
+  .status.online::before {
+    content: ''; display: inline-block; width: 6px; height: 6px;
+    background: #4ade80; border-radius: 50%; margin-right: 5px;
+  }
+  #logout-btn {
+    border: none; background: none; color: var(--text-dim);
+    font-size: 13px; font-family: inherit; padding: 6px;
+  }
+
+  /* --- Messages --- */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 18px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bubble-row { display: flex; flex-direction: column; }
+  .bubble-row.me { align-items: flex-end; }
+  .bubble-row.them { align-items: flex-start; }
+  .sender-label { font-size: 11px; color: var(--text-dim); margin: 0 6px 2px; }
+  .bubble {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: 15px;
+    line-height: 1.35;
+    word-wrap: break-word;
+  }
+  .bubble.me { background: var(--bubble-me); color: #1a1200; border-bottom-right-radius: 6px; }
+  .bubble.them { background: var(--bubble-them); color: var(--text); border-bottom-left-radius: 6px; }
+  .bubble .time { display: block; font-size: 10.5px; opacity: 0.6; margin-top: 3px; text-align: right; }
+  .empty-state { margin: auto; text-align: center; color: var(--text-dim); font-size: 14px; padding: 20px; line-height: 1.5; }
+
+  /* --- Input --- */
+  #input-bar {
+    display: flex; align-items: flex-end; gap: 10px;
+    padding: 10px 14px calc(env(safe-area-inset-bottom) + 10px);
+    background: var(--panel);
+    border-top: 1px solid #23282f;
+    flex-shrink: 0;
+  }
+  #text-input {
+    flex: 1; min-height: 40px; max-height: 120px;
+    padding: 10px 14px; border-radius: 20px; border: none;
+    background: #262c36; color: var(--text); font-size: 15px;
+    font-family: inherit; resize: none; outline: none;
+  }
+  #send-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: none;
+    background: var(--accent); color: #1a1200; font-size: 18px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  #send-btn:disabled { opacity: 0.35; }
+  #conn-status { font-size: 11.5px; text-align: center; padding: 6px; color: var(--text-dim); flex-shrink: 0; }
+  #conn-status.error { color: var(--danger); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="app-root">
+
+  <!-- AUTH -->
+  <div id="auth-screen">
+    <h1 id="auth-title">Вход</h1>
+    <p class="sub" id="auth-sub">Войдите, чтобы попасть в чат. Если аккаунта ещё нет — переключитесь на регистрацию ниже.</p>
+
+    <input id="email-input" class="auth-field" type="email" placeholder="Email" autocapitalize="off" autocorrect="off">
+    <input id="password-input" class="auth-field" type="password" placeholder="Пароль (минимум 6 символов)">
+
+    <div id="auth-error"></div>
+    <div id="auth-loading" class="hidden">Подождите…</div>
+
+    <button id="auth-submit" class="auth-btn">Войти</button>
+    <button id="auth-toggle" class="auth-btn secondary">Нет аккаунта? Зарегистрироваться</button>
+  </div>
+
+  <!-- CHAT -->
+  <div id="chat-screen" class="hidden" style="display:flex; flex-direction:column; height:100%;">
+    <header>
+      <div class="avatar" id="peer-avatar">Ч</div>
+      <div class="header-info">
+        <div class="name">Общий чат</div>
+        <div class="status online" id="status-line">подключение...</div>
+      </div>
+      <button id="logout-btn">Выйти</button>
+    </header>
+
+    <div id="messages">
+      <div class="empty-state">Загружаю сообщения…</div>
+    </div>
+
+    <div id="conn-status"></div>
+
+    <div id="input-bar">
+      <textarea id="text-input" rows="1" placeholder="Сообщение"></textarea>
+      <button id="send-btn" disabled>↑</button>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getFirestore, collection, addDoc, query, orderBy, limit,
+    onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBsm7o0SwTZCCk3VQc_ZOT_WQokI9EaLpc",
+    authDomain: "messenger-c8483.firebaseapp.com",
+    projectId: "messenger-c8483",
+    storageBucket: "messenger-c8483.firebasestorage.app",
+    messagingSenderId: "278474093521",
+    appId: "1:278474093521:web:356302e628d7c95fbbe6f0"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const messagesRef = collection(db, "messages");
+
+  let unsubscribeMessages = null;
+
+  // ---------- Elements ----------
+  const authScreen = document.getElementById('auth-screen');
+  const chatScreen = document.getElementById('chat-screen');
+  const authTitle = document.getElementById('auth-title');
+  const authSub = document.getElementById('auth-sub');
+  const emailInput = document.getElementById('email-input');
+  const passwordInput = document.getElementById('password-input');
+  const authError = document.getElementById('auth-error');
+  const authLoading = document.getElementById('auth-loading');
+  const authSubmit = document.getElementById('auth-submit');
+  const authToggle = document.getElementById('auth-toggle');
+  const logoutBtn = document.getElementById('logout-btn');
+
+  const messagesEl = document.getElementById('messages');
+  const textInput = document.getElementById('text-input');
+  const sendBtn = document.getElementById('send-btn');
+  const connStatus = document.getElementById('conn-status');
+  const statusLine = document.getElementById('status-line');
+
+  let mode = 'login'; // 'login' | 'signup'
+
+  function setMode(m) {
+    mode = m;
+    authError.textContent = '';
+    if (m === 'login') {
+      authTitle.textContent = 'Вход';
+      authSub.textContent = 'Войдите, чтобы попасть в чат.';
+      authSubmit.textContent = 'Войти';
+      authToggle.textContent = 'Нет аккаунта? Зарегистрироваться';
+    } else {
+      authTitle.textContent = 'Регистрация';
+      authSub.textContent = 'Придумайте email и пароль — это будет ваш аккаунт.';
+      authSubmit.textContent = 'Зарегистрироваться';
+      authToggle.textContent = 'Уже есть аккаунт? Войти';
+    }
+  }
+  authToggle.addEventListener('click', () => setMode(mode === 'login' ? 'signup' : 'login'));
+
+  function friendlyError(code) {
+    const map = {
+      'auth/invalid-email': 'Некорректный email',
+      'auth/missing-password': 'Введите пароль',
+      'auth/weak-password': 'Пароль слишком короткий (минимум 6 символов)',
+      'auth/email-already-in-use': 'Этот email уже зарегистрирован — попробуйте войти',
+      'auth/invalid-credential': 'Неверный email или пароль',
+      'auth/user-not-found': 'Такого аккаунта нет — попробуйте зарегистрироваться',
+      'auth/wrong-password': 'Неверный пароль',
+      'auth/too-many-requests': 'Слишком много попыток, подождите немного'
+    };
+    return map[code] || 'Что-то пошло не так, попробуйте ещё раз';
+  }
+
+  authSubmit.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    authError.textContent = '';
+    if (!email || !password) {
+      authError.textContent = 'Заполните email и пароль';
+      return;
+    }
+    authSubmit.disabled = true;
+    authLoading.classList.remove('hidden');
+    try {
+      if (mode === 'signup') {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (e) {
+      authError.textContent = friendlyError(e.code);
+    } finally {
+      authSubmit.disabled = false;
+      authLoading.classList.add('hidden');
+    }
+  });
+
+  logoutBtn.addEventListener('click', () => signOut(auth));
+
+  // ---------- Auth state ----------
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      authScreen.classList.add('hidden');
+      chatScreen.classList.remove('hidden');
+      startChat(user);
+    } else {
+      chatScreen.classList.add('hidden');
+      authScreen.classList.remove('hidden');
+      emailInput.value = '';
+      passwordInput.value = '';
+      if (unsubscribeMessages) { unsubscribeMessages(); unsubscribeMessages = null; }
+    }
+  });
+
+  // ---------- Chat ----------
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatTime(ts) {
+    if (!ts) return '';
+    const d = ts.toDate ? ts.toDate() : new Date();
+    return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+  }
+
+  function startChat(user) {
+    const myName = user.email.split('@')[0];
+
+    const q = query(messagesRef, orderBy("createdAt", "asc"), limit(200));
+    unsubscribeMessages = onSnapshot(q, (snapshot) => {
+      statusLine.textContent = 'в сети';
+      connStatus.textContent = '';
+      connStatus.classList.remove('error');
+
+      if (snapshot.empty) {
+        messagesEl.innerHTML = '<div class="empty-state">Пока пусто. Напишите первое сообщение.</div>';
+        return;
+      }
+
+      messagesEl.innerHTML = snapshot.docs.map(doc => {
+        const m = doc.data();
+        const mine = m.senderEmail === user.email;
+        const side = mine ? 'me' : 'them';
+        return `<div class="bubble-row ${side}">
+          ${!mine ? `<div class="sender-label">${escapeHtml(m.senderName || '?')}</div>` : ''}
+          <div class="bubble ${side}">${escapeHtml(m.text)}<span class="time">${formatTime(m.createdAt)}</span></div>
+        </div>`;
+      }).join('');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }, (error) => {
+      connStatus.textContent = 'Нет связи с сервером: ' + error.message;
+      connStatus.classList.add('error');
+    });
+
+    async function sendMessage() {
+      const text = textInput.value.trim();
+      if (!text) return;
+      sendBtn.disabled = true;
+      textInput.value = '';
+      textInput.style.height = 'auto';
+      try {
+        await addDoc(messagesRef, {
+          senderEmail: user.email,
+          senderName: myName,
+          text: text,
+          createdAt: serverTimestamp()
+        });
+      } catch (e) {
+        connStatus.textContent = 'Не отправилось: ' + e.message;
+        connStatus.classList.add('error');
+      }
+    }
+
+    textInput.oninput = () => {
+      sendBtn.disabled = textInput.value.trim().length === 0;
+      textInput.style.height = 'auto';
+      textInput.style.height = Math.min(textInput.scrollHeight, 120) + 'px';
+    };
+    textInput.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    };
+    sendBtn.onclick = sendMessage;
+  }
+
+  setMode('login');
+</script>
+</body>
+</html>
